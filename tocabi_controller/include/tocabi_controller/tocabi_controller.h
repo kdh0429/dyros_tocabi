@@ -66,9 +66,15 @@ struct ArmTaskCommand
   double l_x;
   double l_y;
   double l_z;
+  double l_roll;
+  double l_pitch;
+  double l_yaw;
   double r_x;
   double r_y;
   double r_z;
+  double r_roll;
+  double r_pitch;
+  double r_yaw;
   int mode;
 };
 

@@ -171,9 +171,17 @@ void TocabiController::ArmTaskCommandCallback(const tocabi_controller::ArmTaskCo
     atc.l_x = msg->l_x;
     atc.l_y = msg->l_y;
     atc.l_z = msg->l_z;
+    atc.l_roll = msg->l_roll*DEG2RAD;
+    atc.l_pitch = msg->l_pitch*DEG2RAD;
+    atc.l_yaw = msg->l_yaw*DEG2RAD;
+    
     atc.r_x = msg->r_x;
     atc.r_y = msg->r_y;
     atc.r_z = msg->r_z;
+    atc.r_roll = msg->r_roll*DEG2RAD;
+    atc.r_pitch = msg->r_pitch*DEG2RAD;
+    atc.r_yaw = msg->r_yaw*DEG2RAD;
+
     atc.mode = msg->mode;
 
     tocabi_.link_[Right_Foot].Set_initpos();
@@ -191,9 +199,9 @@ void TocabiController::ArmTaskCommandCallback(const tocabi_controller::ArmTaskCo
     TargetDelta_r << atc.r_x, atc.r_y, atc.r_z;
 
     tocabi_.link_[Left_Hand].x_desired = tocabi_.link_[Left_Hand].x_init + TargetDelta_l;
-    tocabi_.link_[Left_Hand].rot_desired =tocabi_.link_[Left_Hand].rot_init;
+    tocabi_.link_[Left_Hand].rot_desired = DyrosMath::rotateWithX(atc.l_roll) * DyrosMath::rotateWithY(atc.l_pitch) * DyrosMath::rotateWithZ(atc.l_yaw) * tocabi_.link_[Left_Hand].rot_init;
     tocabi_.link_[Right_Hand].x_desired = tocabi_.link_[Right_Hand].x_init + TargetDelta_r;
-    tocabi_.link_[Right_Hand].rot_desired =tocabi_.link_[Right_Hand].rot_init;
+    tocabi_.link_[Right_Hand].rot_desired = DyrosMath::rotateWithX(atc.r_roll) * DyrosMath::rotateWithY(atc.r_pitch) * DyrosMath::rotateWithZ(atc.r_yaw) * tocabi_.link_[Right_Hand].rot_init;
 
     std::cout << "Arm Command Recieved" << endl;
     std::cout << "Init Pos Left: " << tocabi_.link_[Left_Hand].x_init << endl;
@@ -2009,7 +2017,7 @@ void TocabiController::dynamicsThreadLow()
                 for (int i = 0; i<6; i++)
                 {
                     k_pos(i) = 10;
-                    k_rot(i) = 10;
+                    k_rot(i) = 5;
                 }
 
                 error_v.segment<3>(0) = tocabi_.link_[Left_Hand].x_traj -  tocabi_.link_[Left_Hand].xpos;

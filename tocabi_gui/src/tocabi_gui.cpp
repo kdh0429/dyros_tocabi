@@ -527,9 +527,17 @@ void TocabiGui::armsendcb()
     arm_task_msg.l_x = ui_.text_l_x->text().toFloat();
     arm_task_msg.l_y = ui_.text_l_y->text().toFloat();
     arm_task_msg.l_z = ui_.text_l_z->text().toFloat();
+    arm_task_msg.l_roll = ui_.text_l_roll->text().toFloat();
+    arm_task_msg.l_pitch = ui_.text_l_pitch->text().toFloat();
+    arm_task_msg.l_yaw = ui_.text_l_yaw->text().toFloat();
+
     arm_task_msg.r_x = ui_.text_r_x->text().toFloat();
     arm_task_msg.r_y = ui_.text_r_y->text().toFloat();
     arm_task_msg.r_z = ui_.text_r_z->text().toFloat();
+    arm_task_msg.r_roll = ui_.text_r_roll->text().toFloat();
+    arm_task_msg.r_pitch = ui_.text_r_pitch->text().toFloat();
+    arm_task_msg.r_yaw = ui_.text_r_yaw->text().toFloat();
+
     arm_task_msg.time = ui_.text_traj_time->text().toFloat();
     arm_task_msg.mode = ui_.comboBox_arm_mode->currentText().toInt();
 

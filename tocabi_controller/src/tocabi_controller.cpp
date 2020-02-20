@@ -1,7 +1,6 @@
 #include "tocabi_controller/tocabi_controller.h"
 #include "tocabi_controller/terminal.h"
 #include "tocabi_controller/wholebody_controller.h"
-#include "tocabi_controller/custom_controller.h"
 #include "tocabi_controller/TaskCommand.h"
 #include <tf/transform_datatypes.h>
 #include "stdlib.h"
@@ -161,13 +160,20 @@ void TocabiController::TaskCommandCallback(const tocabi_controller::TaskCommandC
 
     std::cout << "init set - COM x : " << tocabi_.link_[COM_id].x_init(0) << "\t y : " << tocabi_.link_[COM_id].x_init(1) << std::endl;
 
-    data_out << "###############  COMMAND RECEIVED  ###############" << std::endl;
+    out << "###############  COMMAND RECEIVED  ###############" << std::endl;
 }
 
 void TocabiController::stateThread()
 {
     s_.connect();
-    s_.stateThread2();
+    if (dc.mode == "realrobot")
+    {
+        s_.stateThread2();
+    }
+    else
+    {
+        s_.stateThread2();
+    }
 }
 
 void TocabiController::dynamicsThreadHigh()
@@ -210,7 +216,7 @@ void TocabiController::dynamicsThreadHigh()
                 }*/
                 for (int i = 0; i < MODEL_DOF; i++)
                 {
-                    torque_desired(i) = Kps[i] * (tocabi_.q_desired_(i) - tocabi_.q_(i)) - Kvs[i] * (tocabi_.q_dot_(i));
+                    torque_desired(i) = Kps[i] * (q_desired_(i) - q_(i)) - Kvs[i] * (q_dot_(i));
                 }
             }
 
@@ -318,13 +324,9 @@ void TocabiController::dynamicsThreadLow()
     strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
     current_time = buf;
     std::string file_name = path + "sim_data" + current_time + ".txt";
-    data_out = std::ofstream(file_name.c_str());
+    out = std::ofstream(file_name.c_str());
 
     std::stringstream ss;
-
-    ///////////////////////
-
-    CustomController mycontroller(tocabi_);
 
     //Control Loop Start
     while ((!shutdown_tocabi_bool))
@@ -381,7 +383,10 @@ void TocabiController::dynamicsThreadLow()
         wc_.update(tocabi_);
 
         sec = std::chrono::high_resolution_clock::now() - start_time;
-
+        if (sec.count() - control_time_ > 0.01)
+        {
+            // std::cout << "diff ::" << sec.count() - control_time_ << std::endl; //<<" dyn_low current time : " << control_time_ << "   chrono : " << sec.count() << std::endl;
+        }
         ///////////////////////////////////////////////////////////////////////////////////////
         /////////////              Controller Code Here !                     /////////////////
         ///////////////////////////////////////////////////////////////////////////////////////
@@ -402,7 +407,8 @@ void TocabiController::dynamicsThreadLow()
             {
                 wc_.set_contact(tocabi_, 1, 1);
 
-                //torque_grav = wc_.gravity_compensation_torque(tocabi_);
+                //torque_grav = wc_.gravity_compensation_torque(tocabi_, dc.fixedgravity);
+                //torque_grav = wc_.gravity_compensation_torque(dc.fixedgravity);
                 task_number = 6;
                 J_task.setZero(task_number, MODEL_DOF_VIRTUAL);
                 f_star.setZero(task_number);
@@ -1850,11 +1856,11 @@ void TocabiController::dynamicsThreadLow()
                 double lz_y, rz_y;
                 if (control_time_ == tc.command_time)
                 {
-                    data_out << "t \t ce \t lz \t rz \t lee \t re \t lfz \t rfz \t ly \t ry" << std::endl;
+                    out << "t \t ce \t lz \t rz \t lee \t re \t lfz \t rfz \t ly \r ry" << std::endl;
                 }
                 if (control_time_ < tc.command_time + tc.traj_time)
                 {
-                    data_out << control_time_ << "\t" << tocabi_.link_[COM_id].x_traj(1) - tocabi_.link_[COM_id].xpos(1) << "\t" << tocabi_.ContactForce(3) / tocabi_.ContactForce(2) << "\t" << tocabi_.ContactForce(9) / tocabi_.ContactForce(8) << "\t" << lrot_eulr(0) << "\t" << rrot_eulr(0) << "\t" << tocabi_.ContactForce(2) << "\t" << tocabi_.ContactForce(8) << "\t" << tocabi_.link_[Left_Foot].xpos(1) << "\t" << tocabi_.link_[Right_Foot].xpos(1) << std::endl;
+                    out << control_time_ << "\t" << tocabi_.link_[COM_id].x_traj(1) - tocabi_.link_[COM_id].xpos(1) << "\t" << tocabi_.ContactForce(3) / tocabi_.ContactForce(2) << "\t" << tocabi_.ContactForce(9) / tocabi_.ContactForce(8) << "\t" << lrot_eulr(0) << "\t" << rrot_eulr(0) << "\t" << tocabi_.ContactForce(2) << "\t" << tocabi_.ContactForce(8) << "\t" << tocabi_.link_[Left_Foot].xpos(1) << "\t" << tocabi_.link_[Right_Foot].xpos(1) << std::endl;
                 }
 
                 //std::cout << "cf: " << std::endl
@@ -1919,21 +1925,144 @@ void TocabiController::dynamicsThreadLow()
             }
             else if (tc.mode == 14)
             {
-                //example custom controller
-                cr_mode = 2; //turn off contact torque redistribution
-                torque_grav.setZero();
-                torque_task.setZero();
+                ///////// Jacobian based ik arm controller (Daegyu)/////////////////
+                task_number = 6;
+                Eigen::Matrix<double, 6, 8> J_task_LA;
+                J_task_LA.block(0, 0, 6, 8) = tocabi_.link_[Left_Hand].Jac.block(0,21,6,8);
+                Eigen::Matrix<double, 8, 6> J_task_inv;
+                J_task_inv = DyrosMath::pinv_SVD(J_task_LA);
 
-                mycontroller.compute_slow();
+                tocabi_.link_[Left_Hand].x_desired = tocabi_.link_[Left_Hand].x_init;
+                tocabi_.link_[Left_Hand].x_desired(0) = tocabi_.link_[Left_Hand].x_init(0) + 0.00;
+                tocabi_.link_[Left_Hand].x_desired(1) = tocabi_.link_[Left_Hand].x_init(1) + 0.15;
+                tocabi_.link_[Left_Hand].x_desired(2) = tocabi_.link_[Left_Hand].x_init(2) + 0.10; // set target x so as to elevate left arm 0.2m higher
+                tocabi_.link_[Left_Hand].rot_desired = tocabi_.link_[Left_Hand].rot_init;
 
+                tocabi_.link_[Left_Hand].Set_Trajectory_from_quintic(control_time_, tc.command_time, tc.command_time + tc.traj_time);
+                tocabi_.link_[Left_Hand].Set_Trajectory_rotation(control_time_, tc.command_time, tc.command_time + tc.traj_time, false);
                 
-                torque_task = mycontroller.getControl();
+                Eigen::Vector6d x_dot_desired;
+                Eigen::Vector3d error_v;
+                Eigen::Vector3d error_w;                
+                Eigen::Vector3d k_pos;
+                Eigen::Vector3d k_rot;
+
+                k_pos(0) = 10;
+                k_pos(1) = 10;
+                k_pos(2) = 10;
+
+                k_rot(0) = 10;
+                k_rot(1) = 10;
+                k_rot(2) = 10;
+
+                error_v = tocabi_.link_[Left_Hand].x_traj -  tocabi_.link_[Left_Hand].xpos;
+                error_w = -DyrosMath::getPhi(tocabi_.link_[Left_Hand].Rotm, tocabi_.link_[Left_Hand].r_traj);
+
+                for(int i = 0; i<3; i++)
+                {
+                    x_dot_desired(i) = tocabi_.link_[Left_Hand].v_traj(i) + k_pos(i)*error_v(i); // linear velocity
+                    x_dot_desired(i+3) = tocabi_.link_[Left_Hand].w_traj(i) + k_rot(i)*error_w(i);
+                }
+                q_dot_desired_.segment<8>(15) = J_task_inv*x_dot_desired;
+                q_desired_.segment<8>(15) = q_.segment<8>(15) + q_dot_desired_.segment<8>(15)/dc.dym_hz;
+
+                Eigen::MatrixXd kp(8,1);
+                Eigen::MatrixXd kv(8,1);
+                
+                
+                for(int i = 0; i<8; i++)
+                {
+                    kp(i) = 25;
+                    kv(i) = 10;
+                }
+
+                //torque_task.setZero(MODEL_DOF);
+                for(int i = 0; i<8; i++)
+                {
+                    torque_task(i+15) += kp(i)*(q_desired_(i+15) - q_(i+15)) + kv(i)*(q_dot_desired_(i+15) - q_dot_(i+15));
+                }           
+            }
+            else if (tc.mode == 15)
+            {
+                const int arm_task_number = 6;
+                const int arm_dof = 8;
+                ////////// CoM Control //////////////////////
+                wc_.set_contact(tocabi_, 1, 1);
+                task_number = 6;
+                J_task.setZero(task_number, MODEL_DOF_VIRTUAL);
+                f_star.setZero(task_number);
+
+                J_task = tocabi_.link_[COM_id].Jac;
+                J_task.block(0, 0, 3, MODEL_DOF_VIRTUAL) = tocabi_.link_[COM_id].Jac_COM_p;
+                J_task.block(0, 21, 3, arm_dof).setZero(); // Exclude Left Arm Jacobian
+
+                tocabi_.link_[COM_id].x_desired = tocabi_.link_[COM_id].x_init;
+                tocabi_.link_[COM_id].Set_Trajectory_from_quintic(control_time_, tc.command_time, tc.command_time + tc.traj_time);
+
+                f_star = wc_.getfstar6d(tocabi_, COM_id);
+                torque_grav.setZero();
+                torque_task = wc_.task_control_torque_QP2(tocabi_, J_task, f_star);
+
+                ///////// Jacobian based ik arm controller (Daegyu)/////////////////
+                Eigen::Matrix<double, arm_task_number, arm_dof> J_task_LA;
+                J_task_LA.block(0, 0, arm_task_number, arm_dof) = tocabi_.link_[Left_Hand].Jac.block(0,21,arm_task_number,arm_dof);
+                Eigen::Matrix<double, arm_dof, arm_task_number> J_task_inv;
+                J_task_inv = DyrosMath::pinv_SVD(J_task_LA);
+
+                tocabi_.link_[Left_Hand].x_desired = tocabi_.link_[Left_Hand].x_init;
+                tocabi_.link_[Left_Hand].x_desired(0) = tocabi_.link_[Left_Hand].x_init(0) + 0.00;
+                tocabi_.link_[Left_Hand].x_desired(1) = tocabi_.link_[Left_Hand].x_init(1) + 0.15;
+                tocabi_.link_[Left_Hand].x_desired(2) = tocabi_.link_[Left_Hand].x_init(2) + 0.10; // set target x so as to elevate left arm 0.2m higher
+                tocabi_.link_[Left_Hand].rot_desired = tocabi_.link_[Left_Hand].rot_init;
+
+                tocabi_.link_[Left_Hand].Set_Trajectory_from_quintic(control_time_, tc.command_time, tc.command_time + tc.traj_time);
+                tocabi_.link_[Left_Hand].Set_Trajectory_rotation(control_time_, tc.command_time, tc.command_time + tc.traj_time, false);
+                
+                Eigen::Vector6d x_dot_desired;
+                Eigen::Vector3d error_v;
+                Eigen::Vector3d error_w;                
+                Eigen::Vector3d k_pos;
+                Eigen::Vector3d k_rot;
+
+                k_pos(0) = 10;
+                k_pos(1) = 10;
+                k_pos(2) = 10;
+
+                k_rot(0) = 10;
+                k_rot(1) = 10;
+                k_rot(2) = 10;
+
+                error_v = tocabi_.link_[Left_Hand].x_traj -  tocabi_.link_[Left_Hand].xpos;
+                error_w = -DyrosMath::getPhi(tocabi_.link_[Left_Hand].Rotm, tocabi_.link_[Left_Hand].r_traj);
+
+                for(int i = 0; i<3; i++)
+                {
+                    x_dot_desired(i) = tocabi_.link_[Left_Hand].v_traj(i) + k_pos(i)*error_v(i); // linear velocity
+                    x_dot_desired(i+3) = tocabi_.link_[Left_Hand].w_traj(i) + k_rot(i)*error_w(i);
+                }
+                q_dot_desired_.segment<8>(15) = J_task_inv*x_dot_desired;
+                q_desired_.segment<8>(15) = q_.segment<8>(15) + q_dot_desired_.segment<8>(15)/dc.dym_hz;
+
+                Eigen::MatrixXd kp(8,1);
+                Eigen::MatrixXd kv(8,1);
+                
+                
+                for(int i = 0; i<8; i++)
+                {
+                    kp(i) = 16;
+                    kv(i) = 8;
+                }
+
+                for(int i = 0; i<8; i++)
+                {
+                    torque_task(i+15) += kp(i)*(q_desired_(i+15) - q_(i+15)) + kv(i)*(q_dot_desired_(i+15) - q_dot_(i+15));
+                }           
             }
         }
         else
         {
             wc_.set_contact(tocabi_, 1, 1);
-            torque_grav = wc_.gravity_compensation_torque(tocabi_);
+            torque_grav = wc_.gravity_compensation_torque(tocabi_, dc.fixedgravity);
             //torque_grav = wc_.task_control_torque_QP_gravity(red_);
         }
 
@@ -2148,11 +2277,11 @@ void TocabiController::getState()
     sim_time = dc.sim_time;
     dym_hz = dc.dym_hz;
     stm_hz = dc.stm_hz;
-    //q_ = dc.q_;
-    //q_virtual_ = dc.q_virtual_;
-    //q_dot_ = dc.q_dot_;
-    //q_dot_virtual_ = dc.q_dot_virtual_;
-    //q_ddot_virtual_ = dc.q_ddot_virtual_;
+    q_ = dc.q_;
+    q_virtual_ = dc.q_virtual_;
+    q_dot_ = dc.q_dot_;
+    q_dot_virtual_ = dc.q_dot_virtual_;
+    q_ddot_virtual_ = dc.q_ddot_virtual_;
     torque_ = dc.torque_;
 
     tocabi_.q_ = dc.q_;
@@ -2186,6 +2315,7 @@ void TocabiController::getState()
         tocabi_.link_[i].w = dc.link_[i].w;
     }
 
+    tocabi_.yaw_radian = dc.yaw_radian;
     tocabi_.roll = dc.roll;
     tocabi_.pitch = dc.pitch;
     tocabi_.yaw = dc.yaw;

@@ -69,11 +69,10 @@ add_library(tocabi_controller_lib
   src/mujoco_interface.cpp
   src/tocabi_controller.cpp
   src/wholebody_controller.cpp
-  src/custom_controller.cpp
   src/mx5_imu.cpp
 )
 
-add_executable(tocabi_controller src/base.cpp)
+add_executable(tocabi_controller src/controller.cpp)
 
 target_link_libraries(tocabi_controller_lib
   ${catkin_LIBRARIES}

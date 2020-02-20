@@ -64,21 +64,19 @@ class TocabiController
 public:
   TocabiController(DataContainer &dc_global, StateManager &sm, DynamicsManager &dm);
 
-  DataContainer &dc;
-  TaskCommand tc;
-
   void stateThread();
   void dynamicsThreadLow();
   void dynamicsThreadHigh();
   void tuiThread();
+  DataContainer &dc;
+  TaskCommand tc;
+  ros::Subscriber task_command;
   void TaskCommandCallback(const tocabi_controller::TaskCommandConstPtr &msg);
   void ContinuityChecker(double data);
   void ZMPmonitor();
-  void pubfromcontroller();
-  
-  ros::Subscriber task_command;
-  std::ofstream data_out;
+  std::ofstream out;
 
+  void pubfromcontroller();
   ros::Publisher point_pub;
   ros::Publisher point_pub2;
   geometry_msgs::PolygonStamped pointpub_msg;
@@ -103,13 +101,14 @@ private:
   bool task_switch = false;
 
   int dym_hz, stm_hz;
-/*
+
   Eigen::VectorQd q_;
   Eigen::VectorQVQd q_virtual_;
   Eigen::VectorQd q_dot_;
   Eigen::VectorVQd q_dot_virtual_;
-  Eigen::VectorVQd q_ddot_virtual_;*/
+  Eigen::VectorVQd q_ddot_virtual_;
   Eigen::VectorQd q_desired_;
+  Eigen::VectorQd q_dot_desired_;
   Eigen::VectorQd torque_;
   //Command Var
   Eigen::VectorQd torque_desired;

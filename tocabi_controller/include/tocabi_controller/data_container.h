@@ -178,6 +178,7 @@ public:
   Link link_[LINK_NUMBER + 1];
 
   double roll, pitch, yaw;
+  double yaw_radian;
 
   Eigen::MatrixVVd A_;
   Eigen::MatrixVVd A_inv;

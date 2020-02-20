@@ -59,6 +59,19 @@ struct TaskCommand
   int mode;
 };
 
+struct ArmTaskCommand
+{
+  double command_time;
+  double traj_time;
+  double l_x;
+  double l_y;
+  double l_z;
+  double r_x;
+  double r_y;
+  double r_z;
+  int mode;
+};
+
 class TocabiController
 {
 public:
@@ -72,6 +85,9 @@ public:
   TaskCommand tc;
   ros::Subscriber task_command;
   void TaskCommandCallback(const tocabi_controller::TaskCommandConstPtr &msg);
+  ArmTaskCommand atc;
+  ros::Subscriber arm_task_command;
+  void ArmTaskCommandCallback(const tocabi_controller::ArmTaskCommandConstPtr &msg);
   void ContinuityChecker(double data);
   void ZMPmonitor();
   std::ofstream out;

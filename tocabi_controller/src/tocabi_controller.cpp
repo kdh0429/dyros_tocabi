@@ -167,6 +167,7 @@ void TocabiController::TaskCommandCallback(const tocabi_controller::TaskCommandC
 void TocabiController::ArmTaskCommandCallback(const tocabi_controller::ArmTaskCommandConstPtr &msg)
 {
     atc.command_time = control_time_;
+    control_time_pre_ = control_time_;
     atc.traj_time = msg->time;
     atc.l_x = msg->l_x;
     atc.l_y = msg->l_y;
@@ -2017,7 +2018,7 @@ void TocabiController::dynamicsThreadLow()
                 for (int i = 0; i<6; i++)
                 {
                     k_pos(i) = 10;
-                    k_rot(i) = 5;
+                    k_rot(i) = 4;
                 }
 
                 error_v.segment<3>(0) = tocabi_.link_[Left_Hand].x_traj -  tocabi_.link_[Left_Hand].xpos;
@@ -2040,17 +2041,16 @@ void TocabiController::dynamicsThreadLow()
                     q_dot_desired_(15+i) = q_dot_arm(i);
                     q_dot_desired_(25+i) = q_dot_arm(i+arm_dof);
                 }
-                q_desired_.segment<8>(15) = q_.segment<8>(15) + q_dot_desired_.segment<8>(15)/dc.dym_hz;
-                q_desired_.segment<8>(25) = q_.segment<8>(25) + q_dot_desired_.segment<8>(25)/dc.dym_hz;
+                q_desired_.segment<8>(15) = q_.segment<8>(15) + q_dot_desired_.segment<8>(15)*(control_time_ - control_time_pre_);
+                q_desired_.segment<8>(25) = q_.segment<8>(25) + q_dot_desired_.segment<8>(25)*(control_time_ - control_time_pre_);
 
                 Eigen::MatrixXd kp(8,1);
                 Eigen::MatrixXd kv(8,1);
                 
-                
                 for(int i = 0; i<8; i++)
                 {
-                    kp(i) = 16;
-                    kv(i) = 8;
+                    kp(i) = 9;
+                    kv(i) = 6;
                 }
 
                 for(int i = 0; i<8; i++)
@@ -2058,6 +2058,7 @@ void TocabiController::dynamicsThreadLow()
                     torque_task(i+15) += kp(i)*(q_desired_(i+15) - q_(i+15)) + kv(i)*(q_dot_desired_(i+15) - q_dot_(i+15));
                     torque_task(i+25) += kp(i)*(q_desired_(i+25) - q_(i+25)) + kv(i)*(q_dot_desired_(i+25) - q_dot_(i+25));
                 }           
+                control_time_pre_ = control_time_;
             }
         }
         else

@@ -117,6 +117,7 @@ private:
   double time;
   double sim_time;
   double control_time_;
+  double control_time_pre_;
 
   bool safetymode;
 

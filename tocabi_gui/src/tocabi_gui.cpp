@@ -539,9 +539,23 @@ void TocabiGui::armsendcb()
     arm_task_msg.r_yaw = ui_.text_r_yaw->text().toFloat();
 
     arm_task_msg.time = ui_.text_traj_time->text().toFloat();
-    arm_task_msg.mode = ui_.comboBox_arm_mode->currentText().toInt();
+    arm_task_msg.mode = ui_.comboBox_arm_mode->currentIndex();
 
     arm_task_pub.publish(arm_task_msg);
+
+    ui_.text_l_x->setText(QString::number(0.0, 'f', 1));
+    ui_.text_l_y->setText(QString::number(0.0, 'f', 1));
+    ui_.text_l_z->setText(QString::number(0.0, 'f', 1));
+    ui_.text_l_roll->setText(QString::number(0.0, 'f', 1));
+    ui_.text_l_pitch->setText(QString::number(0.0, 'f', 1));
+    ui_.text_l_yaw->setText(QString::number(0.0, 'f', 1));
+
+    ui_.text_r_x->setText(QString::number(0.0, 'f', 1));
+    ui_.text_r_y->setText(QString::number(0.0, 'f', 1));
+    ui_.text_r_z->setText(QString::number(0.0, 'f', 1));
+    ui_.text_r_roll->setText(QString::number(0.0, 'f', 1));
+    ui_.text_r_pitch->setText(QString::number(0.0, 'f', 1));
+    ui_.text_r_yaw->setText(QString::number(0.0, 'f', 1));
 }
 
 void TocabiGui::imucb(const sensor_msgs::ImuConstPtr &msg)
